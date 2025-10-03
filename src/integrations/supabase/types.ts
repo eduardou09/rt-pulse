@@ -14,7 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      candidatos: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          status: string
+          vaga_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          status?: string
+          vaga_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          status?: string
+          vaga_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidatos_vaga_id_fkey"
+            columns: ["vaga_id"]
+            isOneToOne: false
+            referencedRelation: "vagas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vagas: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          status: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          status?: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          status?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
