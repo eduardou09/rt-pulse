@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Plus, Power } from "lucide-react";
+import { Briefcase, Plus, Power, MessageSquare, X } from "lucide-react";
 import Layout from "@/components/Layout";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -15,6 +15,7 @@ type Vaga = {
   id: string;
   titulo: string;
   descricao: string | null;
+  perguntas: string[] | null;
   status: string;
   created_at: string;
 };
@@ -22,6 +23,7 @@ type Vaga = {
 export default function Vaga() {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [perguntas, setPerguntas] = useState<string[]>([""]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -40,7 +42,7 @@ export default function Vaga() {
   });
 
   const createVagaMutation = useMutation({
-    mutationFn: async (newVaga: { titulo: string; descricao: string; status: string }) => {
+    mutationFn: async (newVaga: { titulo: string; descricao: string; perguntas: string[] | null; status: string }) => {
       const { data, error } = await supabase
         .from("vagas")
         .insert([newVaga])
@@ -54,6 +56,7 @@ export default function Vaga() {
       queryClient.invalidateQueries({ queryKey: ["vagas"] });
       setTitulo("");
       setDescricao("");
+      setPerguntas([""]);
       setDialogOpen(false);
       toast({
         title: "Vaga criada!",
@@ -99,7 +102,29 @@ export default function Vaga() {
 
   const handleCreateVaga = (e: React.FormEvent) => {
     e.preventDefault();
-    createVagaMutation.mutate({ titulo, descricao, status: "inativa" });
+    const perguntasLimpas = perguntas.filter(p => p.trim() !== "");
+    createVagaMutation.mutate({ 
+      titulo, 
+      descricao, 
+      perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
+      status: "inativa" 
+    });
+  };
+
+  const addPergunta = () => {
+    setPerguntas([...perguntas, ""]);
+  };
+
+  const removePergunta = (index: number) => {
+    if (perguntas.length > 1) {
+      setPerguntas(perguntas.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePergunta = (index: number, value: string) => {
+    const updated = [...perguntas];
+    updated[index] = value;
+    setPerguntas(updated);
   };
 
   const handleToggleStatus = (vaga: Vaga) => {
@@ -142,6 +167,53 @@ export default function Vaga() {
                   onChange={(e) => setDescricao(e.target.value)}
                   rows={4}
                 />
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Perguntas para o candidato
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                      {perguntas.filter(p => p.trim() !== "").length} pergunta(s)
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {perguntas.map((pergunta, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          placeholder={`Pergunta ${index + 1} (ex: Você tem experiência com vendas?)`}
+                          value={pergunta}
+                          onChange={(e) => updatePergunta(index, e.target.value)}
+                          className="flex-1"
+                        />
+                        {perguntas.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removePergunta(index)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addPergunta}
+                    className="w-full gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar Pergunta
+                  </Button>
+                </div>
+
                 <Button type="submit" className="w-full" disabled={createVagaMutation.isPending}>
                   {createVagaMutation.isPending ? "Criando..." : "Criar Vaga"}
                 </Button>
@@ -173,7 +245,20 @@ export default function Vaga() {
                       <Badge className="bg-secondary text-secondary-foreground">Ativa</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
+                    {activeVaga.perguntas && activeVaga.perguntas.length > 0 && (
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4" />
+                          Perguntas do Processo ({activeVaga.perguntas.length})
+                        </h3>
+                        <ol className="list-decimal list-inside space-y-2 text-sm">
+                          {activeVaga.perguntas.map((p, i) => (
+                            <li key={i} className="text-muted-foreground">{p}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       onClick={() => handleToggleStatus(activeVaga)}

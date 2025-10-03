@@ -51,6 +51,7 @@ export type Database = {
           created_at: string
           descricao: string | null
           id: string
+          perguntas: Json | null
           status: string
           titulo: string
         }
@@ -58,6 +59,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          perguntas?: Json | null
           status?: string
           titulo: string
         }
@@ -65,6 +67,7 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           id?: string
+          perguntas?: Json | null
           status?: string
           titulo?: string
         }
