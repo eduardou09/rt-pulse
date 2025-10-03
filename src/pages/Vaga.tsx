@@ -7,8 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Plus, Power, MessageSquare, X } from "lucide-react";
+import { Briefcase, Plus, Power, MessageSquare, X, Pencil, Trash2 } from "lucide-react";
 import Layout from "@/components/Layout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type Vaga = {
@@ -25,6 +35,10 @@ export default function Vaga() {
   const [descricao, setDescricao] = useState("");
   const [perguntas, setPerguntas] = useState<string[]>([""]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingVaga, setEditingVaga] = useState<Vaga | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [deletingVaga, setDeletingVaga] = useState<Vaga | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -84,14 +98,68 @@ export default function Vaga() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagas"] });
       toast({
-        title: "Status atualizado!",
-        description: "O status da vaga foi alterado.",
+        title: "Status atualizado",
+        description: "O status da vaga foi alterado com sucesso.",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
-        title: "Erro",
-        description: error.message,
+        title: "Erro ao atualizar status",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateVagaMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Vaga> }) => {
+      const { error } = await supabase
+        .from("vagas")
+        .update(updates)
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagas"] });
+      toast({
+        title: "Vaga atualizada",
+        description: "A vaga foi atualizada com sucesso.",
+      });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao atualizar vaga",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteVagaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("vagas")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagas"] });
+      toast({
+        title: "Vaga excluída",
+        description: "A vaga foi excluída com sucesso.",
+      });
+      setDeleteDialogOpen(false);
+      setDeletingVaga(null);
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao excluir vaga",
+        description: "Tente novamente mais tarde.",
         variant: "destructive",
       });
     },
@@ -100,15 +168,55 @@ export default function Vaga() {
   const activeVaga = vagas?.find((v) => v.status === "ativa");
   const inactiveVagas = vagas?.filter((v) => v.status === "inativa");
 
+  const resetForm = () => {
+    setTitulo("");
+    setDescricao("");
+    setPerguntas([""]);
+    setEditingVaga(null);
+    setIsEditMode(false);
+  };
+
   const handleCreateVaga = (e: React.FormEvent) => {
     e.preventDefault();
     const perguntasLimpas = perguntas.filter(p => p.trim() !== "");
-    createVagaMutation.mutate({ 
-      titulo, 
-      descricao, 
-      perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
-      status: "inativa" 
-    });
+    
+    if (isEditMode && editingVaga) {
+      updateVagaMutation.mutate({
+        id: editingVaga.id,
+        updates: {
+          titulo,
+          descricao,
+          perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
+        },
+      });
+    } else {
+      createVagaMutation.mutate({ 
+        titulo, 
+        descricao, 
+        perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
+        status: "inativa" 
+      });
+    }
+  };
+
+  const handleEditVaga = (vaga: Vaga) => {
+    setEditingVaga(vaga);
+    setTitulo(vaga.titulo);
+    setDescricao(vaga.descricao || "");
+    setPerguntas(vaga.perguntas || [""]);
+    setIsEditMode(true);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteVaga = (vaga: Vaga) => {
+    setDeletingVaga(vaga);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingVaga) {
+      deleteVagaMutation.mutate(deletingVaga.id);
+    }
   };
 
   const addPergunta = () => {
@@ -140,18 +248,24 @@ export default function Vaga() {
             <h1 className="text-4xl font-bold text-foreground mb-2">Gerenciar Vagas</h1>
             <p className="text-muted-foreground">Controle de vagas ativas e inativas</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
+              <Button size="lg" className="gap-2" onClick={() => {
+                resetForm();
+                setDialogOpen(true);
+              }}>
                 <Plus className="w-5 h-5" />
                 Nova Vaga
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Criar Nova Vaga</DialogTitle>
+                <DialogTitle>{isEditMode ? "Editar Vaga" : "Criar Nova Vaga"}</DialogTitle>
                 <DialogDescription>
-                  Preencha os dados da nova vaga. Ela será criada como inativa.
+                  {isEditMode ? "Modifique os dados da vaga." : "Preencha os dados da nova vaga. Ela será criada como inativa."}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateVaga} className="space-y-4 mt-4">
@@ -214,8 +328,15 @@ export default function Vaga() {
                   </Button>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={createVagaMutation.isPending}>
-                  {createVagaMutation.isPending ? "Criando..." : "Criar Vaga"}
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={(createVagaMutation.isPending || updateVagaMutation.isPending) || !titulo.trim()}
+                >
+                  {(createVagaMutation.isPending || updateVagaMutation.isPending)
+                    ? (isEditMode ? "Salvando..." : "Criando...")
+                    : (isEditMode ? "Salvar Alterações" : "Criar Vaga")
+                  }
                 </Button>
               </form>
             </DialogContent>
@@ -259,15 +380,25 @@ export default function Vaga() {
                         </ol>
                       </div>
                     )}
-                    <Button
-                      variant="outline"
-                      onClick={() => handleToggleStatus(activeVaga)}
-                      disabled={toggleStatusMutation.isPending}
-                      className="gap-2"
-                    >
-                      <Power className="w-4 h-4" />
-                      Desativar Vaga
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleEditVaga(activeVaga)}
+                        className="flex-1 gap-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleToggleStatus(activeVaga)}
+                        disabled={toggleStatusMutation.isPending}
+                        className="flex-1 gap-2"
+                      >
+                        <Power className="w-4 h-4" />
+                        Desativar
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -291,7 +422,31 @@ export default function Vaga() {
                           <Badge variant="secondary">Inativa</Badge>
                         </div>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-3">
+                        {vaga.perguntas && vaga.perguntas.length > 0 && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>{vaga.perguntas.length} {vaga.perguntas.length === 1 ? 'pergunta configurada' : 'perguntas configuradas'}</span>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleEditVaga(vaga)}
+                            className="flex-1 gap-2"
+                          >
+                            <Pencil className="w-4 h-4" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDeleteVaga(vaga)}
+                            className="flex-1 gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Excluir
+                          </Button>
+                        </div>
                         <Button
                           onClick={() => handleToggleStatus(vaga)}
                           disabled={toggleStatusMutation.isPending || !!activeVaga}
@@ -321,6 +476,32 @@ export default function Vaga() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir a vaga "{deletingVaga?.titulo}". 
+              Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setDeletingVaga(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
