@@ -338,7 +338,7 @@ export default function Vaga() {
                 Nova Vaga
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{isEditMode ? "Editar Vaga" : "Criar Nova Vaga"}</DialogTitle>
                 <DialogDescription>
