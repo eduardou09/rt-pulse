@@ -21,11 +21,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
+type PerguntaComCriterio = {
+  pergunta: string;
+  criterio: string;
+};
+
 type Vaga = {
   id: string;
   titulo: string;
   descricao: string | null;
-  perguntas: string[] | null;
+  perguntas: PerguntaComCriterio[] | null;
   status: string;
   created_at: string;
 };
@@ -33,7 +38,9 @@ type Vaga = {
 export default function Vaga() {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [perguntas, setPerguntas] = useState<string[]>([""]);
+  const [perguntas, setPerguntas] = useState<PerguntaComCriterio[]>([
+    { pergunta: "", criterio: "" }
+  ]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVaga, setEditingVaga] = useState<Vaga | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -56,7 +63,7 @@ export default function Vaga() {
   });
 
   const createVagaMutation = useMutation({
-    mutationFn: async (newVaga: { titulo: string; descricao: string; perguntas: string[] | null; status: string }) => {
+    mutationFn: async (newVaga: { titulo: string; descricao: string; perguntas: PerguntaComCriterio[] | null; status: string }) => {
       const { data, error } = await supabase
         .from("vagas")
         .insert([newVaga])
@@ -68,9 +75,7 @@ export default function Vaga() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagas"] });
-      setTitulo("");
-      setDescricao("");
-      setPerguntas([""]);
+      resetForm();
       setDialogOpen(false);
       toast({
         title: "Vaga criada!",
@@ -171,14 +176,42 @@ export default function Vaga() {
   const resetForm = () => {
     setTitulo("");
     setDescricao("");
-    setPerguntas([""]);
+    setPerguntas([{ pergunta: "", criterio: "" }]);
     setEditingVaga(null);
     setIsEditMode(false);
   };
 
+  const normalizePerguntas = (perguntas: any): PerguntaComCriterio[] | null => {
+    if (!perguntas || perguntas.length === 0) return null;
+    
+    // Se já é array de objetos com pergunta e criterio, retornar direto
+    if (typeof perguntas[0] === 'object' && 'pergunta' in perguntas[0]) {
+      return perguntas;
+    }
+    
+    // Se é array de strings (formato antigo), converter
+    return perguntas.map((p: string) => ({
+      pergunta: p,
+      criterio: "" // Critério vazio para vagas antigas
+    }));
+  };
+
   const handleCreateVaga = (e: React.FormEvent) => {
     e.preventDefault();
-    const perguntasLimpas = perguntas.filter(p => p.trim() !== "");
+    
+    // Filtrar perguntas com pergunta E critério preenchidos
+    const perguntasLimpas = perguntas.filter(
+      p => p.pergunta.trim() !== "" && p.criterio.trim() !== ""
+    );
+    
+    if (perguntasLimpas.length === 0) {
+      toast({
+        title: "Atenção",
+        description: "Adicione pelo menos uma pergunta com critério de aprovação.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (isEditMode && editingVaga) {
       updateVagaMutation.mutate({
@@ -203,7 +236,8 @@ export default function Vaga() {
     setEditingVaga(vaga);
     setTitulo(vaga.titulo);
     setDescricao(vaga.descricao || "");
-    setPerguntas(vaga.perguntas || [""]);
+    const normalized = normalizePerguntas(vaga.perguntas);
+    setPerguntas(normalized || [{ pergunta: "", criterio: "" }]);
     setIsEditMode(true);
     setDialogOpen(true);
   };
@@ -220,7 +254,7 @@ export default function Vaga() {
   };
 
   const addPergunta = () => {
-    setPerguntas([...perguntas, ""]);
+    setPerguntas([...perguntas, { pergunta: "", criterio: "" }]);
   };
 
   const removePergunta = (index: number) => {
@@ -229,9 +263,13 @@ export default function Vaga() {
     }
   };
 
-  const updatePergunta = (index: number, value: string) => {
+  const updatePergunta = (
+    index: number,
+    field: 'pergunta' | 'criterio',
+    value: string
+  ) => {
     const updated = [...perguntas];
-    updated[index] = value;
+    updated[index][field] = value;
     setPerguntas(updated);
   };
 
@@ -286,33 +324,59 @@ export default function Vaga() {
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <MessageSquare className="w-4 h-4" />
-                      Perguntas para o candidato
+                      Perguntas e Critérios
                     </label>
                     <span className="text-xs text-muted-foreground">
-                      {perguntas.filter(p => p.trim() !== "").length} pergunta(s)
+                      {perguntas.filter(p => p.pergunta.trim() !== "" && p.criterio.trim() !== "").length} completa(s)
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Os critérios serão usados para avaliar automaticamente os candidatos
+                  </p>
                   
-                  <div className="space-y-2">
-                    {perguntas.map((pergunta, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          placeholder={`Pergunta ${index + 1} (ex: Você tem experiência com vendas?)`}
-                          value={pergunta}
-                          onChange={(e) => updatePergunta(index, e.target.value)}
-                          className="flex-1"
-                        />
-                        {perguntas.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removePergunta(index)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
+                  <div className="space-y-3">
+                    {perguntas.map((item, index) => (
+                      <Card key={index} className="p-4 space-y-3 border-2">
+                        <div className="flex items-start justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Pergunta {index + 1}
+                          </span>
+                          {perguntas.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removePergunta(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium">Pergunta para o candidato</label>
+                          <Textarea
+                            placeholder="Ex: Quantos anos de experiência você tem com vendas?"
+                            value={item.pergunta}
+                            onChange={(e) => updatePergunta(index, 'pergunta', e.target.value)}
+                            rows={2}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-orange-600">
+                            Critério de Aprovação
+                          </label>
+                          <Input
+                            placeholder="Ex: + 10 anos de experiência"
+                            value={item.criterio}
+                            onChange={(e) => updatePergunta(index, 'criterio', e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Este critério será usado para qualificar o candidato automaticamente
+                          </p>
+                        </div>
+                      </Card>
                     ))}
                   </div>
                   
@@ -368,16 +432,32 @@ export default function Vaga() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {activeVaga.perguntas && activeVaga.perguntas.length > 0 && (
-                      <div className="p-4 bg-muted rounded-lg">
-                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <div className="p-4 bg-muted rounded-lg space-y-3">
+                        <h3 className="font-semibold flex items-center gap-2">
                           <MessageSquare className="w-4 h-4" />
-                          Perguntas do Processo ({activeVaga.perguntas.length})
+                          Perguntas e Critérios de Qualificação ({activeVaga.perguntas.length})
                         </h3>
-                        <ol className="list-decimal list-inside space-y-2 text-sm">
-                          {activeVaga.perguntas.map((p, i) => (
-                            <li key={i} className="text-muted-foreground">{p}</li>
+                        
+                        <div className="space-y-3">
+                          {normalizePerguntas(activeVaga.perguntas)?.map((item, i) => (
+                            <div key={i} className="p-3 bg-background rounded border space-y-2">
+                              <div className="flex items-start gap-2">
+                                <span className="font-medium text-sm text-muted-foreground">
+                                  {i + 1}.
+                                </span>
+                                <p className="font-medium flex-1">{item.pergunta}</p>
+                              </div>
+                              {item.criterio && (
+                                <div className="flex items-start gap-2 ml-5">
+                                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 shrink-0">
+                                    Critério
+                                  </Badge>
+                                  <span className="text-sm text-muted-foreground">{item.criterio}</span>
+                                </div>
+                              )}
+                            </div>
                           ))}
-                        </ol>
+                        </div>
                       </div>
                     )}
                     <div className="flex gap-2">
