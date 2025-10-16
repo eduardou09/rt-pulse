@@ -31,6 +31,7 @@ type Vaga = {
   titulo: string;
   descricao: string | null;
   perguntas: PerguntaComCriterio[] | null;
+  minimo_acertos: number;
   status: string;
   created_at: string;
 };
@@ -41,6 +42,7 @@ export default function Vaga() {
   const [perguntas, setPerguntas] = useState<PerguntaComCriterio[]>([
     { pergunta: "", criterio: "" }
   ]);
+  const [minimoAcertos, setMinimoAcertos] = useState<number>(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVaga, setEditingVaga] = useState<Vaga | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -63,7 +65,7 @@ export default function Vaga() {
   });
 
   const createVagaMutation = useMutation({
-    mutationFn: async (newVaga: { titulo: string; descricao: string; perguntas: PerguntaComCriterio[] | null; status: string }) => {
+    mutationFn: async (newVaga: { titulo: string; descricao: string; perguntas: PerguntaComCriterio[] | null; minimo_acertos: number; status: string }) => {
       const { data, error } = await supabase
         .from("vagas")
         .insert([newVaga])
@@ -177,6 +179,7 @@ export default function Vaga() {
     setTitulo("");
     setDescricao("");
     setPerguntas([{ pergunta: "", criterio: "" }]);
+    setMinimoAcertos(1);
     setEditingVaga(null);
     setIsEditMode(false);
   };
@@ -213,6 +216,24 @@ export default function Vaga() {
       return;
     }
     
+    if (minimoAcertos > perguntasLimpas.length) {
+      toast({
+        title: "Erro de Validação",
+        description: `O mínimo de acertos (${minimoAcertos}) não pode ser maior que o total de perguntas (${perguntasLimpas.length}).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (minimoAcertos < 1) {
+      toast({
+        title: "Erro de Validação",
+        description: "O mínimo de acertos deve ser pelo menos 1.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (isEditMode && editingVaga) {
       updateVagaMutation.mutate({
         id: editingVaga.id,
@@ -220,6 +241,7 @@ export default function Vaga() {
           titulo,
           descricao,
           perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
+          minimo_acertos: minimoAcertos,
         },
       });
     } else {
@@ -227,6 +249,7 @@ export default function Vaga() {
         titulo, 
         descricao, 
         perguntas: perguntasLimpas.length > 0 ? perguntasLimpas : null,
+        minimo_acertos: minimoAcertos,
         status: "inativa" 
       });
     }
@@ -238,6 +261,7 @@ export default function Vaga() {
     setDescricao(vaga.descricao || "");
     const normalized = normalizePerguntas(vaga.perguntas);
     setPerguntas(normalized || [{ pergunta: "", criterio: "" }]);
+    setMinimoAcertos(vaga.minimo_acertos);
     setIsEditMode(true);
     setDialogOpen(true);
   };
@@ -277,6 +301,21 @@ export default function Vaga() {
     const newStatus = vaga.status === "ativa" ? "inativa" : "ativa";
     toggleStatusMutation.mutate({ id: vaga.id, newStatus });
   };
+
+  // Ajuste automático quando adicionar/remover perguntas
+  useEffect(() => {
+    const totalPerguntas = perguntas.filter(
+      p => p.pergunta.trim() !== "" && p.criterio.trim() !== ""
+    ).length;
+    
+    if (minimoAcertos > totalPerguntas && totalPerguntas > 0) {
+      setMinimoAcertos(totalPerguntas);
+    }
+    
+    if (totalPerguntas > 0 && minimoAcertos < 1) {
+      setMinimoAcertos(1);
+    }
+  }, [perguntas]);
 
   return (
     <Layout>
@@ -392,6 +431,48 @@ export default function Vaga() {
                   </Button>
                 </div>
 
+                {/* Critério de Aprovação */}
+                <div className="space-y-3 p-4 bg-orange-50 border-2 border-orange-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                      ⚡ Critério de Aprovação
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Quantas perguntas o candidato precisa acertar?
+                    </label>
+                    
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min="1"
+                        max={perguntas.filter(p => p.pergunta.trim() !== "" && p.criterio.trim() !== "").length}
+                        value={minimoAcertos}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          const totalPerguntas = perguntas.filter(
+                            p => p.pergunta.trim() !== "" && p.criterio.trim() !== ""
+                          ).length;
+                          
+                          if (value >= 1 && value <= totalPerguntas) {
+                            setMinimoAcertos(value);
+                          }
+                        }}
+                        className="w-20 text-center text-lg font-bold"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        de {perguntas.filter(p => p.pergunta.trim() !== "" && p.criterio.trim() !== "").length} perguntas
+                      </span>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      💡 O candidato precisa acertar pelo menos <strong>{minimoAcertos}</strong> {minimoAcertos === 1 ? "pergunta" : "perguntas"} para ser aprovado nesta fase
+                    </p>
+                  </div>
+                </div>
+
                 <Button 
                   type="submit" 
                   className="w-full" 
@@ -433,10 +514,15 @@ export default function Vaga() {
                   <CardContent className="space-y-4">
                     {activeVaga.perguntas && activeVaga.perguntas.length > 0 && (
                       <div className="p-4 bg-muted rounded-lg space-y-3">
-                        <h3 className="font-semibold flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4" />
-                          Perguntas e Critérios de Qualificação ({activeVaga.perguntas.length})
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4" />
+                            Perguntas de Qualificação ({activeVaga.perguntas.length})
+                          </h3>
+                          <Badge className="bg-orange-500 text-white">
+                            Mínimo: {activeVaga.minimo_acertos} acertos
+                          </Badge>
+                        </div>
                         
                         <div className="space-y-3">
                           {normalizePerguntas(activeVaga.perguntas)?.map((item, i) => (
@@ -506,7 +592,12 @@ export default function Vaga() {
                         {vaga.perguntas && vaga.perguntas.length > 0 && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <MessageSquare className="h-4 w-4" />
-                            <span>{vaga.perguntas.length} {vaga.perguntas.length === 1 ? 'pergunta configurada' : 'perguntas configuradas'}</span>
+                            <span>
+                              {vaga.perguntas.length} {vaga.perguntas.length === 1 ? 'pergunta' : 'perguntas'}
+                              <span className="text-orange-600 font-medium ml-1">
+                                (mín. {vaga.minimo_acertos} acertos)
+                              </span>
+                            </span>
                           </div>
                         )}
                         <div className="flex gap-2">
