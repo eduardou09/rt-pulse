@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Users, UserCheck, UserX } from "lucide-react";
+import { Users, UserCheck, UserX, Phone } from "lucide-react";
 import Layout from "@/components/Layout";
 import { format } from "date-fns";
 
@@ -15,6 +15,7 @@ type Candidato = {
   vaga_id: string | null;
   vaga_titulo: string;
   nome: string;
+  telefone: string | null;
   resumo_experiencia: string | null;
   interesse_remoto: string | null;
   feedback_final: string | null;
@@ -39,9 +40,9 @@ export default function Candidatos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("candidatos")
-        .select("*")
+        .select("*, telefone")
         .order("created_at", { ascending: false });
-
+      
       if (error) throw error;
       return data as Candidato[];
     },
@@ -148,7 +149,15 @@ export default function Candidatos() {
               <Card key={candidato.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <CardTitle className="text-xl">{candidato.nome}</CardTitle>
+                    <div className="space-y-2">
+                      <CardTitle className="text-xl">{candidato.nome}</CardTitle>
+                      {candidato.telefone && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="w-4 h-4" />
+                          <span>{candidato.telefone}</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-2 items-end">
                       {candidato.interesse_remoto && (
                         <Badge variant="outline" className="whitespace-nowrap">

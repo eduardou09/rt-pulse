@@ -26,6 +26,7 @@ export type Database = {
           respostas_personalizadas: Json | null
           resumo_experiencia: string | null
           status: string
+          telefone: string | null
           vaga_id: string | null
           vaga_titulo: string | null
         }
@@ -40,6 +41,7 @@ export type Database = {
           respostas_personalizadas?: Json | null
           resumo_experiencia?: string | null
           status?: string
+          telefone?: string | null
           vaga_id?: string | null
           vaga_titulo?: string | null
         }
@@ -54,6 +56,7 @@ export type Database = {
           respostas_personalizadas?: Json | null
           resumo_experiencia?: string | null
           status?: string
+          telefone?: string | null
           vaga_id?: string | null
           vaga_titulo?: string | null
         }
