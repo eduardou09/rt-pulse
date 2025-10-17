@@ -32,6 +32,7 @@ type Candidato = {
 
 export default function Candidatos() {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [vagaFilter, setVagaFilter] = useState<string>("todas");
 
   const { data: candidatos, isLoading } = useQuery({
     queryKey: ["candidatos"],
@@ -46,13 +47,27 @@ export default function Candidatos() {
     },
   });
 
-  const filteredCandidatos = candidatos?.filter((c) => {
-    if (statusFilter === "todos") return true;
-    return c.status === statusFilter;
+  const { data: vagas } = useQuery({
+    queryKey: ["vagas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vagas")
+        .select("id, titulo, status")
+        .order("titulo", { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
   });
 
-  const qualificados = candidatos?.filter((c) => c.status === "qualificado").length || 0;
-  const naoQualificados = candidatos?.filter((c) => c.status === "não qualificado").length || 0;
+  const filteredCandidatos = candidatos?.filter((c) => {
+    const passaStatus = statusFilter === "todos" || c.status === statusFilter;
+    const passaVaga = vagaFilter === "todas" || c.vaga_id === vagaFilter;
+    return passaStatus && passaVaga;
+  });
+
+  const qualificados = filteredCandidatos?.filter((c) => c.status === "qualificado").length || 0;
+  const naoQualificados = filteredCandidatos?.filter((c) => c.status === "não qualificado").length || 0;
 
   return (
     <Layout>
@@ -95,16 +110,31 @@ export default function Candidatos() {
           </Card>
         </div>
 
-        {/* Filter */}
-        <div className="mb-6">
+        {/* Filters */}
+        <div className="mb-6 flex flex-col md:flex-row gap-4">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full md:w-64">
               <SelectValue placeholder="Filtrar por status" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="todos">Todos os Status</SelectItem>
               <SelectItem value="qualificado">Qualificados</SelectItem>
               <SelectItem value="não qualificado">Não Qualificados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={vagaFilter} onValueChange={setVagaFilter}>
+            <SelectTrigger className="w-full md:w-64">
+              <SelectValue placeholder="Filtrar por vaga" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="todas">Todas as Vagas</SelectItem>
+              {vagas?.map((vaga) => (
+                <SelectItem key={vaga.id} value={vaga.id}>
+                  {vaga.titulo}
+                  {vaga.status === 'inativa' && ' (inativa)'}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -207,8 +237,8 @@ export default function Candidatos() {
               <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <p className="text-xl text-muted-foreground">Nenhum candidato encontrado</p>
               <p className="text-sm text-muted-foreground mt-2">
-                {statusFilter !== "todos"
-                  ? "Tente alterar o filtro"
+                {statusFilter !== "todos" || vagaFilter !== "todas"
+                  ? "Tente alterar os filtros para ver mais candidatos"
                   : "Candidatos aparecerão aqui quando chegarem via automação"}
               </p>
             </CardContent>
