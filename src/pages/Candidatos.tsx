@@ -4,16 +4,30 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Users, UserCheck, UserX } from "lucide-react";
 import Layout from "@/components/Layout";
 import { format } from "date-fns";
 
 type Candidato = {
   id: string;
-  nome: string;
-  status: string;
-  vaga_id: string | null;
   created_at: string;
+  vaga_id: string | null;
+  vaga_titulo: string;
+  nome: string;
+  resumo_experiencia: string | null;
+  interesse_remoto: string | null;
+  feedback_final: string | null;
+  fit_cultural: {
+    adaptabilidade?: string;
+    trabalho_em_equipe?: string;
+    mudanca_rotina?: string;
+    etica?: string;
+    valores_pessoais?: string;
+  } | null;
+  respostas_personalizadas: Record<string, string> | null;
+  dados_completos: any | null;
+  status: string;
 };
 
 export default function Candidatos() {
@@ -105,20 +119,85 @@ export default function Candidatos() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-xl">{candidato.nome}</CardTitle>
-                    <Badge
-                      className={
-                        candidato.status === "qualificado"
-                          ? "bg-secondary text-secondary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }
-                    >
-                      {candidato.status === "qualificado" ? "Qualificado" : "Não Qualificado"}
-                    </Badge>
+                    <div className="flex flex-col gap-2 items-end">
+                      {candidato.interesse_remoto && (
+                        <Badge variant="outline" className="whitespace-nowrap">
+                          {candidato.interesse_remoto === "sim" ? "🌍 Remoto" : "📍 Presencial"}
+                        </Badge>
+                      )}
+                      <Badge
+                        className={
+                          candidato.status === "qualificado"
+                            ? "bg-secondary text-secondary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }
+                      >
+                        {candidato.status === "qualificado" ? "Qualificado" : "Não Qualificado"}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription>
+                    {candidato.vaga_titulo && `Vaga: ${candidato.vaga_titulo} • `}
                     Recebido em {format(new Date(candidato.created_at), "dd/MM/yyyy 'às' HH:mm")}
                   </CardDescription>
                 </CardHeader>
+                
+                {(candidato.resumo_experiencia || candidato.fit_cultural || candidato.respostas_personalizadas) && (
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      {candidato.resumo_experiencia && (
+                        <AccordionItem value="resumo">
+                          <AccordionTrigger>📝 Resumo de Experiência</AccordionTrigger>
+                          <AccordionContent>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {candidato.resumo_experiencia}
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+                      
+                      {candidato.fit_cultural && Object.keys(candidato.fit_cultural).length > 0 && (
+                        <AccordionItem value="fit">
+                          <AccordionTrigger>🎯 Fit Cultural</AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-3">
+                              {Object.entries(candidato.fit_cultural).map(([key, value]) => (
+                                <div key={key} className="border-l-2 border-primary/20 pl-3">
+                                  <p className="text-sm font-medium capitalize">
+                                    {key.replace(/_/g, ' ')}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {value}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+                      
+                      {candidato.respostas_personalizadas && Object.keys(candidato.respostas_personalizadas).length > 0 && (
+                        <AccordionItem value="respostas">
+                          <AccordionTrigger>💬 Respostas Personalizadas</AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-3">
+                              {Object.entries(candidato.respostas_personalizadas).map(([pergunta, resposta]) => (
+                                <div key={pergunta} className="border-l-2 border-secondary/20 pl-3">
+                                  <p className="text-sm font-medium">
+                                    {pergunta}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {resposta}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+                    </Accordion>
+                  </CardContent>
+                )}
               </Card>
             ))}
           </div>

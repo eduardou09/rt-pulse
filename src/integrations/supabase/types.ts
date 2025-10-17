@@ -17,24 +17,45 @@ export type Database = {
       candidatos: {
         Row: {
           created_at: string
+          dados_completos: Json | null
+          feedback_final: string | null
+          fit_cultural: Json | null
           id: string
+          interesse_remoto: string | null
           nome: string
+          respostas_personalizadas: Json | null
+          resumo_experiencia: string | null
           status: string
           vaga_id: string | null
+          vaga_titulo: string | null
         }
         Insert: {
           created_at?: string
+          dados_completos?: Json | null
+          feedback_final?: string | null
+          fit_cultural?: Json | null
           id?: string
+          interesse_remoto?: string | null
           nome: string
+          respostas_personalizadas?: Json | null
+          resumo_experiencia?: string | null
           status?: string
           vaga_id?: string | null
+          vaga_titulo?: string | null
         }
         Update: {
           created_at?: string
+          dados_completos?: Json | null
+          feedback_final?: string | null
+          fit_cultural?: Json | null
           id?: string
+          interesse_remoto?: string | null
           nome?: string
+          respostas_personalizadas?: Json | null
+          resumo_experiencia?: string | null
           status?: string
           vaga_id?: string | null
+          vaga_titulo?: string | null
         }
         Relationships: [
           {
