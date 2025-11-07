@@ -1,1 +1,4 @@
-project_id = "boikaxyzhuqhbxqvppbu"
+project_id = "wqntobgaakbcchtqodqx"
+
+[functions.inserir-candidato]
+verify_jwt = false
